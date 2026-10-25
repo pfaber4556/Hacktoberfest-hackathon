@@ -385,7 +385,8 @@ if not mid_term.empty:
             except Exception as e:
                 st.error(f"gemma couldn't make a plan: {e}")
 
-st.subheader("Weekly Survival To-Do List")
+# ---- Interactive Weekly Survival To-Do List
+st.subheader(" Weekly Survival To-Do List")
 available_weeks = sorted([int(w) for w in dated["week"].dropna().unique()])
 if available_weeks:
     selected_w = st.selectbox(
@@ -400,20 +401,18 @@ if available_weeks:
     total_tasks = len(week_items)
     
     if total_tasks > 0:
-        for i, r in week_items.reset_index().iterrows():
-            key = f"todo_{selected_w}_{i}_{r['course']}_{r['title']}"
-            if key not in st.session_state:
-                st.session_state[key] = False
+        for idx, r in week_items.iterrows():
+            # Use the unique DataFrame index (idx) to guarantee a unique key
+            key = f"todo_{selected_w}_{idx}_{r['course']}_{r['title']}"
             
             weight_str = f" — *({r['weight_pct']:g}% of grade)*" if pd.notna(r['weight_pct']) else ""
             type_str = f"[{r['type']}] " if pd.notna(r['type']) else ""
             
+            # st.checkbox automatically manages its state in session_state when a key is provided
             checked = st.checkbox(
                 f"**{r['course']}**: {type_str}{r['title']}{weight_str}", 
-                value=st.session_state[key], 
                 key=key
             )
-            st.session_state[key] = checked
             if checked:
                 completed_count += 1
                 
