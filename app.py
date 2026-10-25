@@ -1,5 +1,5 @@
 """
-crunch week radar 📡
+SyllabuStrat 📡
 drop in all your syllabi -> gemma 4 pulls out every graded thing -> see which weeks will actually hurt.
 run:  streamlit run app.py
 """
@@ -193,7 +193,7 @@ def week_label(w: int, n_weeks: int) -> str:
 
 def make_ics(df: pd.DataFrame, lead_weeks: int) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//crunch week radar//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SyllabuStrat//EN", "CALSCALE:GREGORIAN"]
 
     def event(day: date, summary: str, uid: str):
         lines.extend([
@@ -243,8 +243,8 @@ SAMPLE = [
 
 
 # ---------------------------------------------------------------- ui
-st.set_page_config(page_title="crunch week radar", page_icon="📡", layout="wide")
-st.title("📡 crunch week radar")
+st.set_page_config(page_title="SyllabuStrat", page_icon="📡", layout="wide")
+st.title("📡 SyllabuStrat")
 st.caption("every syllabus in, your actual worst weeks out. weighted by how much of your grade is on the line. "
            "powered by **gemma 4** (open weights) 💎")
 
