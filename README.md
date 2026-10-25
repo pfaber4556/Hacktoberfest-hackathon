@@ -1,9 +1,9 @@
-# 📡 Crunch Week Radar
-Syllabus-to-calendar tool that shows you deadlines. Crunch Week Radar shows you which weeks will actually hurt.
+# 📡 SyllabuStrat
+Syllabus-to-calendar tool that shows you deadlines. SyllabuStrat shows you which weeks will actually hurt.
 
 Every college student gets 4–5 syllabi at the start of the term and never lines them up. So, week 5 sneaks up on you: two midterms and a problem set, worth 45% of your grades, all at once.
 
-Drop in all your syllabi and Crunch Week radar uses **gemma 4** to pull out every exam, project, quiz, and paper, plus how much each one is worth. then it shows you a heatmap of your term weighted by how much of your grade is on the line, not just a pile of dots on a calendar.
+Drop in all your syllabi and SyllabuStrat uses **gemma 4** to pull out every exam, project, quiz, and paper, plus how much each one is worth. then it shows you a heatmap of your term weighted by how much of your grade is on the line, not just a pile of dots on a calendar.
 
 ## what it does
 

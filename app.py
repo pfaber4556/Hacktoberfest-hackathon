@@ -1,5 +1,5 @@
 """
-crunch week radar 📡
+SyllabuStrat 📡
 drop in all your syllabi -> gemma 4 pulls out every graded thing -> see which weeks will actually hurt.
 run:  streamlit run app.py
 """
@@ -234,7 +234,7 @@ def week_label(w: int, n_weeks: int) -> str:
 
 def make_ics(df: pd.DataFrame, lead_weeks: int) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//crunch week radar//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SyllabuStrat//EN", "CALSCALE:GREGORIAN"]
 
     def event(day: date, summary: str, uid: str):
         lines.extend([
@@ -310,74 +310,10 @@ Question: {question}"""
 
 
 # ---------------------------------------------------------------- ui
-st.set_page_config(page_title="crunch week radar", page_icon="📡", layout="wide")
-
-# ---- light + dark: pick colors from whatever theme streamlit is showing (system setting or the ⋮ menu)
-try:
-    IS_DARK = st.context.theme.type == "dark"
-except Exception:
-    IS_DARK = False
-T = {  # page tokens
-    "ink": "#e6edf7", "paper": "#141a24", "rule": "#243149", "margin": "#7d3a3a", "muted": "#9aa8bb",
-    "ribbon": "#e05a59", "alert_bg": "#3a2023", "plank": "#c8d3e3", "empty": "#2a3446", "surface": "#0f141c",
-} if IS_DARK else {
-    "ink": "#13233d", "paper": "#ffffff", "rule": "#dbe6f3", "margin": "#e3a5a5", "muted": "#5d6b7e",
-    "ribbon": "#b8302f", "alert_bg": "#fbefee", "plank": "#13233d", "empty": "#a8b3c2", "surface": "#ffffff",
-}
-# sequential ramp: low values recede toward the background in both modes
-RAMP = (["#16233a", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4", "#cde2fb"] if IS_DARK
-        else RAMP_LIGHT)
-# class colors: same 8 hues in the same order, stepped for each background
-COURSE_COLORS = (["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"] if IS_DARK
-                 else ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"])
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
-:root { /*TOKENS*/ }
-.stApp p, .stApp li, .stApp label, .stApp button, .cwr * { font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
-.stApp h1, .stApp h2, .stApp h3, .cwr-serif { font-family: 'Literata', Georgia, serif !important; color: var(--ink); }
-.stApp h2, .stApp h3 { font-weight: 700; letter-spacing: -0.01em; }
-.cwr-hero h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.05; font-weight: 700; letter-spacing: -0.02em;
-  margin: 0 0 .5rem; padding: 0; max-width: 18ch; }
-.cwr-hero p { font-size: 1.1rem; color: var(--muted); max-width: 60ch; margin: 0 0 1.2rem; }
-.cwr-steps { color: var(--muted); padding-left: 1.2rem; margin: .5rem 0 0; }
-.cwr-steps li { margin: .2rem 0; }
-.stApp .cwr-next, .stApp .cwr-next * { font-family: 'Literata', Georgia, serif !important; }
-.stApp .cwr-next { font-size: clamp(1.25rem, 2.4vw, 1.75rem); font-weight: 500;
-  line-height: 1.3; color: var(--ink); max-width: 38ch; margin: .6rem 0 1rem; }
-.stApp .cwr-next b { font-weight: 700; }
-/* the notebook page the shelf sits on: ruled lines + a margin rule */
-.cwr-page { background-color: var(--paper);
-  background-image: linear-gradient(to right, transparent 46px, var(--margin) 46px, var(--margin) 48px, transparent 48px),
-                    repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px);
-  border: 1px solid var(--rule); border-radius: 6px; padding: 18px 14px 10px 60px; overflow-x: auto; }
-.cwr-shelf { display: flex; align-items: stretch; min-height: 270px; gap: 10px; min-width: 640px; }
-.cwr-week { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
-.cwr-week.past { opacity: .4; }
-.cwr-total { font-size: .85rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
-.cwr-stack { width: 100%; max-width: 64px; display: flex; flex-direction: column-reverse; gap: 2px; }
-.cwr-book { border-radius: 3px 3px 2px 2px; color: #fff; font-size: .62rem; font-weight: 600; line-height: 1.1;
-  display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 3px; }
-.cwr-plank { width: 100%; height: 5px; background: var(--plank); border-radius: 2px; margin-top: 2px; }
-.cwr-wk { font-size: .8rem; font-weight: 600; color: var(--muted); margin-top: 5px; }
-.cwr-week.now .cwr-wk { color: var(--ink); }
-.cwr-ribbon { position: absolute; top: -19px; right: 4px; width: 12px; height: 26px; background: var(--ribbon);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); }
-.cwr-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: .85rem; color: var(--ink); }
-.cwr-key span { display: inline-flex; align-items: center; gap: 6px; }
-.cwr-key i { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
-.cwr-alerts { list-style: none; padding: 10px 14px; margin: 0 0 14px; border-left: 4px solid var(--ribbon);
-  background: var(--alert_bg); border-radius: 0 6px 6px 0; color: var(--ink); max-width: 72ch; }
-.cwr-alerts li { margin: 3px 0; font-size: .95rem; }
-.cwr-alerts li::before { content: "⚠️ "; }
-.cwr-note { font-size: .85rem; color: var(--muted); margin: 8px 0 0; }
-</style>
-<div class="cwr-hero">
-  <h1>how heavy is your quarter, really?</h1>
-  <p>drop in every syllabus. gemma 4 pulls out each exam, paper, and project with its weight, then stacks
-     them week by week so you can see where the work piles up before it does.</p>
-</div>
-""".replace("/*TOKENS*/", " ".join(f"--{k}:{v};" for k, v in T.items())), unsafe_allow_html=True)
+st.set_page_config(page_title="SyllabuStrat", page_icon="📡", layout="wide")
+st.title("📡 SyllabuStrat")
+st.caption("every syllabus in, your actual worst weeks out. weighted by how much of your grade is on the line. "
+           "powered by **gemma 4** (open weights) 💎")
 
 with st.sidebar:
     if not os.environ.get("GEMINI_API_KEY"):
