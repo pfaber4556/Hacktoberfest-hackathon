@@ -654,6 +654,47 @@ if not mid_term.empty:
             except Exception as e:
                 st.error(f"gemma couldn't make a plan: {e}")
 
+# ---- Interactive Weekly Survival To-Do List
+st.subheader("Weekly Survival To-Do List")
+available_weeks = sorted([int(w) for w in dated["week"].dropna().unique()])
+if available_weeks:
+    selected_w = st.selectbox(
+        "Choose a week to plan your attack:", 
+        options=available_weeks, 
+        format_func=lambda w: week_label(w, n_weeks)
+    )
+    week_items = dated[dated["week"] == selected_w]
+    st.markdown(f"**Tasks for {week_label(selected_w, n_weeks)}**")
+    
+    completed_count = 0
+    total_tasks = len(week_items)
+    
+    if total_tasks > 0:
+        for idx, r in week_items.iterrows():
+            # Use the unique DataFrame index (idx) to guarantee a unique key
+            key = f"todo_{selected_w}_{idx}_{r['course']}_{r['title']}"
+            
+            weight_str = f" — *({r['weight_pct']:g}% of grade)*" if pd.notna(r['weight_pct']) else ""
+            type_str = f"[{r['type']}] " if pd.notna(r['type']) else ""
+            
+            # st.checkbox automatically manages its state in session_state when a key is provided
+            checked = st.checkbox(
+                f"**{r['course']}**: {type_str}{r['title']}{weight_str}", 
+                key=key
+            )
+            if checked:
+                completed_count += 1
+                
+        progress = completed_count / total_tasks if total_tasks > 0 else 0
+        st.progress(progress, text=f"Survival Progress: {completed_count}/{total_tasks} completed")
+        
+        if completed_count == total_tasks and total_tasks > 0:
+            st.success("🎉 You're fully prepared for this week! You've got this.")
+    else:
+        st.info("No graded items scheduled for this week. Enjoy the breather!")
+else:
+    st.info("Upload your syllabi to generate your interactive checklist.")
+
 # ---- ask your syllabi
 st.subheader("ask your syllabi")
 sources = st.session_state.get("sources", [])
@@ -692,44 +733,3 @@ else:
 
 # ---- calendar export
 st.download_button("📅 add to my calendar (.ics)", make_ics(df, lead), "syllabustrat.ics", "text/calendar")
-
-with tab_todo:
-    # ---- Interactive Weekly Survival To-Do List Tab
-    st.subheader("✅ Weekly Survival To-Do List")
-    available_weeks = sorted([int(w) for w in dated["week"].dropna().unique()])
-    if available_weeks:
-        selected_w = st.selectbox(
-            "Choose a week to plan your attack:", 
-            options=available_weeks, 
-            format_func=lambda w: week_label(w, n_weeks),
-            key="todo_week_selector"
-        )
-        week_items = dated[dated["week"] == selected_w]
-        st.markdown(f"**Tasks for {week_label(selected_w, n_weeks)}**")
-        
-        completed_count = 0
-        total_tasks = len(week_items)
-        
-        if total_tasks > 0:
-            for idx, r in week_items.iterrows():
-                key = f"todo_{selected_w}_{idx}_{r['course']}_{r['title']}"
-                
-                weight_str = f" — *({r['weight_pct']:g}% of grade)*" if pd.notna(r['weight_pct']) else ""
-                type_str = f"[{r['type']}] " if pd.notna(r['type']) else ""
-                
-                checked = st.checkbox(
-                    f"**{r['course']}**: {type_str}{r['title']}{weight_str}", 
-                    key=key
-                )
-                if checked:
-                    completed_count += 1
-                    
-            progress = completed_count / total_tasks if total_tasks > 0 else 0
-            st.progress(progress, text=f"Survival Progress: {completed_count}/{total_tasks} completed")
-            
-            if completed_count == total_tasks and total_tasks > 0:
-                st.success("🎉 You're fully prepared for this week! You've got this.")
-        else:
-            st.info("No graded items scheduled for this week. Enjoy the breather!")
-    else:
-        st.info("Upload your syllabi to generate your interactive checklist.")
