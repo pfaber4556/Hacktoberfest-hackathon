@@ -480,6 +480,9 @@ if "df" not in st.session_state:
     st.caption("no syllabi handy? try the sample data to see a full quarter.")
     st.stop()
 
+
+
+
 # ---- review + fix what gemma found
 with st.expander("✏️ check what gemma found (edit anything that looks off)", expanded=False):
     edited = st.data_editor(
@@ -494,8 +497,17 @@ with st.expander("✏️ check what gemma found (edit anything that looks off)",
         },
     )
 df = fill_weeks(edited, week1, n_weeks)
-dated = df.dropna(subset=["week"])
-undated = df[df["week"].isna()]
+
+# Initialize assignment statuses
+if "status" not in df.columns:
+    df["status"] = "Not Started"
+
+# Only unfinished assignments count toward remaining workload
+active_df = df[df["status"] != "Completed"].copy()
+
+dated = active_df.dropna(subset=["week"])
+undated = active_df[active_df["week"].isna()]
+
 
 # ---- the bookshelf: each graded item is a book, its thickness is how much of the grade it's worth
 course_list = sorted(df["course"].unique())
@@ -737,6 +749,66 @@ else:
             st.markdown(q)
         with st.chat_message("assistant", avatar="📚"):
             st.markdown(a)
+# ---- assignment tracker
+st.subheader("✅ Assignment Tracker")
+st.caption("Track your progress and see what's left to finish.")
+
+STATUS_OPTIONS = ["Not Started", "In Progress", "Completed"]
+
+# Initialize assignment statuses
+if "status" not in st.session_state["df"].columns:
+    st.session_state["df"]["status"] = "Not Started"
+
+# Editable tracker
+tracker = st.data_editor(
+    st.session_state["df"],
+    hide_index=True,
+    width="stretch",
+    key="assignment_tracker",
+    column_config={
+        "status": st.column_config.SelectboxColumn(
+            "Status",
+            options=STATUS_OPTIONS,
+            required=True,
+        ),
+        "due": st.column_config.DateColumn("Due Date"),
+        "weight_pct": st.column_config.NumberColumn("Weight %"),
+    },
+    disabled=[
+        "course", "title", "type", "due",
+        "week", "weight_pct", "estimated"
+    ],
+)
+
+# Save status changes
+st.session_state["df"]["status"] = tracker["status"].values
+
+total = len(tracker)
+completed = (tracker["status"] == "Completed").sum()
+in_progress = (tracker["status"] == "In Progress").sum()
+remaining = total - completed
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Completed", completed)
+col2.metric("In Progress", in_progress)
+col3.metric("Remaining", remaining)
+
+if total > 0:
+    st.progress(
+        completed / total,
+        text=f"{completed} of {total} assignments completed"
+    )
+
+# Course-by-course progress
+st.markdown("#### Progress by Course")
+
+for course, group in tracker.groupby("course"):
+    done = (group["status"] == "Completed").sum()
+    count = len(group)
+
+    st.write(f"**{course}** — {done}/{count} completed")
+    st.progress(done / count if count else 0)
 
 # ---- calendar export
 st.download_button("📅 add to my calendar (.ics)", make_ics(df, lead), "syllabustrat.ics", "text/calendar")
