@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import time
 from datetime import date, datetime, timedelta, timezone
 
 import altair as alt
@@ -101,7 +102,23 @@ def focus_text(text: str) -> str:
         if GRADE_WORDS.search(line):
             keep.update({i - 1, i, i + 1})
     focused = "\n".join(lines[i] for i in sorted(keep) if 0 <= i < len(lines))
-    return focused[:12000] if len(focused) > 800 else text[:12000]  # tiny result = filter missed, send the start
+    return focused[:9000] if len(focused) > 800 else text[:9000]  # tiny result = filter missed, send the start
+
+
+POLICY_WORDS = re.compile(
+    r"late|drop|lowest|attend|absen|policy|cumulative|final|exam|regrade|make-?up|extension|collab|curve|"
+    r"office hours|grade|grading|%|due|accommodat|calculator|notes|cheat sheet|participation", re.I)
+
+
+def policy_text(text: str) -> str:
+    """for 'ask your syllabi': keep policy + grading lines so every syllabus fits in one request."""
+    lines = text.splitlines()
+    keep = set()
+    for i, line in enumerate(lines):
+        if POLICY_WORDS.search(line):
+            keep.update({i - 1, i, i + 1})
+    focused = "\n".join(lines[i] for i in sorted(keep) if 0 <= i < len(lines))
+    return (focused if len(focused) > 600 else text)[:6000]
 
 
 def shrink_image(data: bytes, mime: str, max_side: int = 1600) -> tuple[bytes, str]:
@@ -151,17 +168,30 @@ def call_gemini(key: str, parts: list[tuple], prompt: str) -> str:
     contents = [p[1] if p[0] == "text" else types.Part.from_bytes(data=p[1], mime_type=p[2]) for p in parts]
     # keep the client in a variable: if only .models is referenced, python closes the client mid-request
     client = genai.Client(api_key=key)
-    try:
-        # MINIMAL thinking = way faster. pulling dates out of a syllabus doesn't need deep reasoning
-        fast = types.GenerateContentConfig(
-            temperature=0.1, thinking_config=types.ThinkingConfig(thinking_level="MINIMAL"))
-        resp = client.models.generate_content(model=GEMINI_MODEL, contents=contents + [prompt], config=fast)
-    except Exception:
-        # older sdk / model that doesn't accept the setting -> normal (slower) call
-        resp = client.models.generate_content(
-            model=GEMINI_MODEL, contents=contents + [prompt],
-            config=types.GenerateContentConfig(temperature=0.1),
-        )
+    # the free tier allows ~16k input tokens per minute PER MODEL. when we hit it, wait the time google
+    # asks for, and spread load onto the other gemma 4 model (it has its own separate quota)
+    models = [GEMINI_MODEL, "gemma-4-31b-it"]
+    use_minimal = True
+    for attempt in range(6):
+        model = models[attempt % 2] if attempt >= 1 else models[0]
+        cfg = types.GenerateContentConfig(temperature=0.1, **(
+            {"thinking_config": types.ThinkingConfig(thinking_level="MINIMAL")} if use_minimal else {}))
+        try:
+            resp = client.models.generate_content(model=model, contents=contents + [prompt], config=cfg)
+            break
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                wait = re.search(r"retry in ([\d.]+)s", msg)
+                time.sleep(min(float(wait.group(1)) + 1, 20) if wait else 5 * (attempt + 1))
+                continue
+            if use_minimal and "thinking" in msg.lower():  # model/sdk doesn't take the setting
+                use_minimal = False
+                continue
+            raise
+    else:
+        raise RuntimeError("google's free tier is maxed out right now. wait a minute and scan again, "
+                           "or upload fewer syllabi at once.")
     # gemma 4 sends its "thinking" as separate parts; keep only the real answer
     parts_out = resp.candidates[0].content.parts or []
     answer = "".join(p.text or "" for p in parts_out if not getattr(p, "thought", False))
@@ -300,7 +330,7 @@ def ask_syllabi(question: str, _sources: list, backend: str, _key: str, _sig: st
     parts = []
     for course, course_parts in _sources:
         parts.append(("text", f"\n===== SYLLABUS FOR {course} ====="))
-        parts += course_parts
+        parts += [("text", policy_text(p[1])) if p[0] == "text" else p for p in course_parts]
     prompt = f"""You have the syllabi above for a student's classes. Answer their question using ONLY what the
 syllabi say. Be brief and direct, casual lowercase tone. Name the class for each fact, like "DSC 80: ...".
 If the syllabi don't say, answer "your syllabi don't say" for that class and suggest asking the instructor.
@@ -311,9 +341,73 @@ Question: {question}"""
 
 # ---------------------------------------------------------------- ui
 st.set_page_config(page_title="SyllabuStrat", page_icon="📡", layout="wide")
-st.title("📡 SyllabuStrat")
-st.caption("every syllabus in, your actual worst weeks out. weighted by how much of your grade is on the line. "
-           "powered by **gemma 4** (open weights) 💎")
+
+# ---- light + dark: pick colors from whatever theme streamlit is showing (system setting or the ⋮ menu)
+try:
+    IS_DARK = st.context.theme.type == "dark"
+except Exception:
+    IS_DARK = False
+T = {  # page tokens
+    "ink": "#e6edf7", "paper": "#141a24", "rule": "#243149", "margin": "#7d3a3a", "muted": "#9aa8bb",
+    "ribbon": "#e05a59", "alert_bg": "#3a2023", "plank": "#c8d3e3", "empty": "#2a3446", "surface": "#0f141c",
+} if IS_DARK else {
+    "ink": "#13233d", "paper": "#ffffff", "rule": "#dbe6f3", "margin": "#e3a5a5", "muted": "#5d6b7e",
+    "ribbon": "#b8302f", "alert_bg": "#fbefee", "plank": "#13233d", "empty": "#a8b3c2", "surface": "#ffffff",
+}
+# sequential ramp: low values recede toward the background in both modes
+RAMP = (["#16233a", "#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4", "#cde2fb"] if IS_DARK
+        else RAMP_LIGHT)
+# class colors: same 8 hues in the same order, stepped for each background
+COURSE_COLORS = (["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"] if IS_DARK
+                 else ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"])
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&display=swap');
+:root { /*TOKENS*/ }
+.stApp p, .stApp li, .stApp label, .stApp button, .cwr * { font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
+.stApp h1, .stApp h2, .stApp h3, .cwr-serif { font-family: 'Literata', Georgia, serif !important; color: var(--ink); }
+.stApp h2, .stApp h3 { font-weight: 700; letter-spacing: -0.01em; }
+.cwr-hero h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.05; font-weight: 700; letter-spacing: -0.02em;
+  margin: 0 0 .5rem; padding: 0; max-width: 18ch; }
+.cwr-hero p { font-size: 1.1rem; color: var(--muted); max-width: 60ch; margin: 0 0 1.2rem; }
+.cwr-steps { color: var(--muted); padding-left: 1.2rem; margin: .5rem 0 0; }
+.cwr-steps li { margin: .2rem 0; }
+.stApp .cwr-next, .stApp .cwr-next * { font-family: 'Literata', Georgia, serif !important; }
+.stApp .cwr-next { font-size: clamp(1.25rem, 2.4vw, 1.75rem); font-weight: 500;
+  line-height: 1.3; color: var(--ink); max-width: 38ch; margin: .6rem 0 1rem; }
+.stApp .cwr-next b { font-weight: 700; }
+/* the notebook page the shelf sits on: ruled lines + a margin rule */
+.cwr-page { background-color: var(--paper);
+  background-image: linear-gradient(to right, transparent 46px, var(--margin) 46px, var(--margin) 48px, transparent 48px),
+                    repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 18px 14px 10px 60px; overflow-x: auto; }
+.cwr-shelf { display: flex; align-items: stretch; min-height: 270px; gap: 10px; min-width: 640px; }
+.cwr-week { flex: 1 0 44px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+.cwr-week.past { opacity: .4; }
+.cwr-total { font-size: .85rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.cwr-stack { width: 100%; max-width: 64px; display: flex; flex-direction: column-reverse; gap: 2px; }
+.cwr-book { border-radius: 3px 3px 2px 2px; color: #fff; font-size: .62rem; font-weight: 600; line-height: 1.1;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; padding: 0 3px; }
+.cwr-plank { width: 100%; height: 5px; background: var(--plank); border-radius: 2px; margin-top: 2px; }
+.cwr-wk { font-size: .8rem; font-weight: 600; color: var(--muted); margin-top: 5px; }
+.cwr-week.now .cwr-wk { color: var(--ink); }
+.cwr-ribbon { position: absolute; top: -19px; right: 4px; width: 12px; height: 26px; background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); }
+.cwr-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: .85rem; color: var(--ink); }
+.cwr-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cwr-key i { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.cwr-alerts { list-style: none; padding: 10px 14px; margin: 0 0 14px; border-left: 4px solid var(--ribbon);
+  background: var(--alert_bg); border-radius: 0 6px 6px 0; color: var(--ink); max-width: 72ch; }
+.cwr-alerts li { margin: 3px 0; font-size: .95rem; }
+.cwr-alerts li::before { content: "⚠️ "; }
+.cwr-note { font-size: .85rem; color: var(--muted); margin: 8px 0 0; }
+</style>
+<div class="cwr-hero">
+  <h1>📡 SyllabuStrat</h1>
+  <p><b>how heavy is your quarter, really?</b> drop in every syllabus. gemma 4 pulls out each exam, paper, and project with its weight, then stacks
+     them week by week so you can see where the work piles up before it does.</p>
+</div>
+""".replace("/*TOKENS*/", " ".join(f"--{k}:{v};" for k, v in T.items())), unsafe_allow_html=True)
 
 with st.sidebar:
     if not os.environ.get("GEMINI_API_KEY"):
@@ -344,7 +438,7 @@ if go:
     rows, bar = [], st.progress(0.0, text=f"gemma is reading {len(files)} syllabi at once...")
     cache = st.session_state.setdefault("scan_cache", {})  # don't re-scan files we've already read
     jobs, sources = {}, []  # sources = what each syllabus said, kept for "ask your syllabi"
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:  # gentle on the free-tier rate limit
         for f in files:
             data = f.getvalue()
             ck = (hashlib.md5(data).hexdigest(), week1, n_weeks, backend)
@@ -638,4 +732,4 @@ else:
             st.markdown(a)
 
 # ---- calendar export
-st.download_button("📅 add to my calendar (.ics)", make_ics(df, lead), "crunch-week-radar.ics", "text/calendar")
+st.download_button("📅 add to my calendar (.ics)", make_ics(df, lead), "syllabustrat.ics", "text/calendar")
