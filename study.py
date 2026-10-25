@@ -71,6 +71,10 @@ def podcast_player(lines: list[dict], T: dict, is_dark: bool) -> str:
       <option>1.3</option></select></label>
     <span id="status"></span>
   </div>
+  <div class="bar voices">
+    <label><b class="m">maya</b> <select id="vmaya" aria-label="maya's voice"></select></label>
+    <label><b class="l">leo</b> <select id="vleo" aria-label="leo's voice"></select></label>
+  </div>
   <div id="lines"></div>
 </div>
 <style>
@@ -88,6 +92,8 @@ def podcast_player(lines: list[dict], T: dict, is_dark: bool) -> str:
   .ln b {{ text-transform:lowercase; margin-right:6px; }}
   .maya b {{ color:{accent}; }} .leo b {{ color:{accent2}; }}
   .ln.on {{ background:{T['rule']}; }}
+  .voices select {{ max-width: 220px; }}
+  .voices .m {{ color:{accent}; }} .voices .l {{ color:{accent2}; }}
 </style>
 <script>
 const L = {data};
@@ -97,16 +103,31 @@ L.forEach((l, i) => {{
   d.innerHTML = '<b>' + l.s + '</b>'; d.appendChild(document.createTextNode(l.t)); box.appendChild(d);
 }});
 const synth = window.speechSynthesis; let idx = 0, playing = false, voices = [];
+// nicer-sounding voices first: mac "premium"/"enhanced"/siri, chrome's google voices, edge's "natural"
+const quality = v => /premium|enhanced|siri|natural|neural|google/i.test(v.name) ? 0 : 1;
+function store(k, v) {{ try {{ localStorage.setItem(k, v); }} catch (e) {{}} }}
+function saved(k) {{ try {{ return localStorage.getItem(k); }} catch (e) {{ return null; }} }}
+function fill(sel, who, fallback) {{
+  const keep = sel.value || saved('voice-' + who);
+  sel.innerHTML = voices.map(v => '<option value="' + v.name.replace(/"/g, '&quot;') + '">' + v.name +
+    (quality(v) === 0 ? ' ✨' : '') + '</option>').join('');
+  const pick = voices.find(v => v.name === keep) || fallback;
+  if (pick) sel.value = pick.name;
+}}
 function loadVoices() {{
-  const en = synth.getVoices().filter(v => v.lang && v.lang.startsWith('en'));
-  voices = en.length ? en : synth.getVoices();
+  if (!synth) return;
+  const all = synth.getVoices(); const en = all.filter(v => v.lang && v.lang.startsWith('en'));
+  voices = (en.length ? en : all).slice().sort((a, b) => quality(a) - quality(b) || a.name.localeCompare(b.name));
+  if (!voices.length) return;
+  const find = n => voices.find(v => v.name.toLowerCase().includes(n));
+  fill(document.getElementById('vmaya'), 'maya', find('samantha') || find('female') || voices[0]);
+  fill(document.getElementById('vleo'), 'leo', find('daniel') || find('alex') || find('male') || voices[Math.min(1, voices.length - 1)]);
 }}
 loadVoices(); if (synth) synth.onvoiceschanged = loadVoices;
+['maya', 'leo'].forEach(who => document.getElementById('v' + who).onchange = e => store('voice-' + who, e.target.value));
 function voiceFor(s) {{
-  if (!voices.length) return null;
-  const pick = n => voices.find(v => v.name.toLowerCase().includes(n));
-  return s === 'maya' ? (pick('samantha') || pick('female') || voices[0])
-                      : (pick('daniel') || pick('alex') || pick('male') || voices[Math.min(1, voices.length - 1)]);
+  const name = document.getElementById(s === 'leo' ? 'vleo' : 'vmaya').value;
+  return voices.find(v => v.name === name) || null;
 }}
 function mark(i) {{
   document.querySelectorAll('.ln').forEach(e => e.classList.remove('on'));
@@ -246,8 +267,10 @@ def render(get_backend, call_model, parse_json, T: dict, is_dark: bool):
     st.markdown(f"### {esc(study.get('title', 'your chapter'))}")
     tab_pod, tab_slides = st.tabs(["🎧 podcast", "🖼️ slides"])
     with tab_pod:
-        components.html(podcast_player(study.get("podcast", []), T, is_dark), height=470, scrolling=False)
-        st.caption("uses your browser's built-in voices. click any line to jump there.")
+        components.html(podcast_player(study.get("podcast", []), T, is_dark), height=510, scrolling=False)
+        st.caption("pick a voice for each host (✨ = higher quality). click any line to jump there. "
+                   "on a mac, more natural voices: System Settings → Accessibility → Spoken Content → "
+                   "System Voice → Manage Voices.")
         script = "\n\n".join(f"{l.get('speaker', '')}: {l.get('line', '')}" for l in study.get("podcast", []))
         st.download_button("download the script", script, "podcast-script.txt", "text/plain")
     with tab_slides:
