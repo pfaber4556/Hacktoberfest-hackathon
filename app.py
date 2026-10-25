@@ -404,8 +404,8 @@ st.markdown("""
 </style>
 <div class="cwr-hero">
   <h1>📡 SyllabuStrat</h1>
-  <p><b>how heavy is your quarter, really?</b> drop in every syllabus. gemma 4 pulls out each exam, paper, and project with its weight, then stacks
-     them week by week so you can see where the work piles up before it does.</p>
+  <p><b>plan your quarter, then study it.</b> drop in your syllabi to see which weeks will pile up, or drop in
+     a textbook chapter and gemma 4 turns it into a podcast and slides.</p>
 </div>
 """.replace("/*TOKENS*/", " ".join(f"--{k}:{v};" for k, v in T.items())), unsafe_allow_html=True)
 
@@ -419,6 +419,13 @@ with st.sidebar:
                           help="double-check this against your school's academic calendar")
     n_weeks = st.number_input("weeks of instruction", 5, 20, 10, help="finals week is added after these")
     lead = st.slider("start prepping how many weeks early?", 1, 4, 2)
+
+# ---- two modes: plan the quarter (syllabi) or study a chapter (textbook -> podcast + slides)
+mode = st.radio("mode", ["📅 plan my quarter", "🎧 study a chapter"], horizontal=True, label_visibility="collapsed")
+if mode.startswith("🎧"):
+    import study
+    study.render(get_backend, call_model, parse_json, T, IS_DARK)
+    st.stop()
 
 files = st.file_uploader("drop in your syllabi (pdf, screenshot, or photo)",
                          type=["pdf", "png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
