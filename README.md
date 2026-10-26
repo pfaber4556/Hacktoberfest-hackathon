@@ -47,10 +47,10 @@ python -m venv venv && source venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env   # Then paste your Gemini API key (or DigitalOcean backup) into .env
 python -m streamlit run app
-
+```
 ---
 
-## ✨ Features
+## **✨ Features**
 
 ### 📅 Plan My Quarter
 
