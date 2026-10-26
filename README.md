@@ -48,6 +48,8 @@ python -m pip install -r requirements.txt
 cp .env.example .env   # Then paste your Gemini API key (or DigitalOcean backup) into .env
 python -m streamlit run app
 
+---
+
 ## ✨ Features
 
 ### 📅 Plan My Quarter
