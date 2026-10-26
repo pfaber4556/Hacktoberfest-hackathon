@@ -44,7 +44,12 @@ Rules:
 - weight_pct = percent of the FINAL course grade for that ONE item. If a category is shared
   ("Midterms 30%, 2 midterms"), split it evenly (15 each) and set weight_estimated to true.
   Recurring items ("weekly quizzes 10%") can be one row with the total weight and week null.
-- If no weight is stated, use null. Never invent dates.
+- If grading is in POINTS, convert to percent of the points needed for full credit (usually 100):
+  "Exams (3 total) 17pts * 3" means each exam is worth 17%. Ignore extra-credit cushions.
+- Exams listed in a calendar ("EXAM 1", "Oct 21 EXAM 1") are graded items even without the word "due".
+- If only a CATEGORY weight is given ("Homework 30%") and the schedule lists the individual items
+  (HW 1 ... HW 8), give each item its share (30 / 8 = 3.75) and set weight_estimated to true.
+- If no weight is stated at all, use null. Never invent dates.
 - type must be one of: {", ".join(TYPES)}
 
 Reply with ONLY valid JSON:
@@ -81,7 +86,7 @@ def file_to_parts(data: bytes, mime: str) -> list[tuple]:
         doc = pymupdf.open(stream=data, filetype="pdf")
         text = "\n".join(page.get_text() for page in doc)
         if len(text.strip()) > 300:
-            return [("text", f"SYLLABUS TEXT:\n{text[:25000]}")]
+            return [("text", f"SYLLABUS TEXT:\n{text[:80000]}")]
         # scanned pdf: render the first few pages as images
         return [("image", page.get_pixmap(dpi=110).tobytes("jpeg", jpg_quality=82), "image/jpeg")
                 for page in list(doc)[:6]]
@@ -94,15 +99,26 @@ GRADE_WORDS = re.compile(
     r"friday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}/\d{1,2}", re.I)
 
 
+WEIGHT_WORDS = re.compile(r"%|percent|\bpts?\b|\d\s*pts|points?|weight|grade breakdown|grading|worth", re.I)
+
+
 def focus_text(text: str) -> str:
-    """keep only the lines about grades, deadlines and dates (plus a line of context). less to read = faster."""
+    """keep only the lines about grades, deadlines and dates (plus a line of context). less to read = faster.
+    the grading breakdown goes FIRST so it never gets cut off, even when it's at the end of a long syllabus."""
     lines = text.splitlines()
-    keep = set()
-    for i, line in enumerate(lines):
-        if GRADE_WORDS.search(line):
-            keep.update({i - 1, i, i + 1})
-    focused = "\n".join(lines[i] for i in sorted(keep) if 0 <= i < len(lines))
-    return focused[:9000] if len(focused) > 800 else text[:9000]  # tiny result = filter missed, send the start
+
+    def pick(pattern, ctx):
+        keep = set()
+        for i, line in enumerate(lines):
+            if pattern.search(line):
+                keep.update(range(i - ctx, i + ctx + 1))
+        return [i for i in sorted(keep) if 0 <= i < len(lines)]
+
+    weights = pick(WEIGHT_WORDS, 2)
+    schedule = [i for i in pick(GRADE_WORDS, 1) if i not in set(weights)]
+    focused = ("GRADING / WEIGHTS:\n" + "\n".join(lines[i] for i in weights) +
+               "\n\nSCHEDULE / DEADLINES:\n" + "\n".join(lines[i] for i in schedule))
+    return focused[:14000] if len(focused) > 800 else text[:14000]  # tiny result = filter missed, send the start
 
 
 POLICY_WORDS = re.compile(
@@ -509,6 +525,24 @@ with st.expander("✏️ check what gemma found (edit anything that looks off)",
     )
 df = fill_weeks(edited, week1, n_weeks)
 
+
+def fill_missing_weights(df: pd.DataFrame) -> pd.DataFrame:
+    """syllabi often weight a category but not each item. share each class's unassigned % evenly across
+    its items with no weight, so the chart isn't driven by whichever few items happened to have a number."""
+    df = df.copy()
+    for course, grp in df.groupby("course"):
+        missing = grp["weight_pct"].isna()
+        if not missing.any():
+            continue
+        leftover = max(0.0, 100.0 - float(grp["weight_pct"].fillna(0).sum()))
+        share = leftover / missing.sum() if leftover > 0 else 0.0
+        df.loc[grp.index[missing], "weight_pct"] = round(share, 1)
+        df.loc[grp.index[missing], "estimated"] = True
+    return df
+
+
+df = fill_missing_weights(df)
+
 # Initialize assignment statuses
 if "status" not in df.columns:
     df["status"] = "Not Started"
@@ -526,12 +560,15 @@ color_of = {c: COURSE_COLORS[i % len(COURSE_COLORS)] for i, c in enumerate(cours
 week_load = dated.groupby("week")["weight_pct"].sum()
 cur = (date.today() - week1).days // 7 + 1
 cur = cur if 1 <= cur <= n_weeks + 1 else None
-px_per_pct = 220 / max(week_load.max() if not week_load.empty else 0, 1)
+# fixed floor so one small item can't fill the whole chart when it's the only thing with a weight
+px_per_pct = 220 / max(week_load.max() if not week_load.empty else 0, 30)
 
 
 def load_word(total: float) -> str:
     """turn a week's summed weight into a plain word. scaled by class count so 3 classes vs 5 feels the same."""
-    share = total / max(len(course_list), 1)  # roughly: % of the whole quarter decided that week
+    # roughly: % of a whole quarter decided that week. assume at least a 4-class load, so one uploaded
+    # syllabus doesn't make three homeworks look "brutal"
+    share = total / max(len(course_list), 4)
     if share <= 0: return ""
     if share < 3: return "light"
     if share < 7: return "busy"
@@ -560,7 +597,8 @@ for w in range(1, n_weeks + 2):
         h = max(6, pct * px_per_pct)
         label = esc(r.course.split()[0] if h < 30 else r.course) if h >= 16 else ""
         books.append(f'<div class="cwr-book" style="height:{h:.0f}px;background:{color_of[r.course]}" '
-                     f'title="{esc(r.course)} {esc(r.title)}: worth {pct:g}% of your {esc(r.course)} grade">{label}</div>')
+                     f'title="{esc(r.course)} {esc(r.title)}: worth {"about " if r.estimated else ""}{pct:g}% of your '
+                     f'{esc(r.course)} grade{" (estimated)" if r.estimated else ""}">{label}</div>')
     total = float(week_load.get(w, 0) or 0)
     cls = "cwr-week" + (" now" if w == cur else "") + (" past" if cur and w < cur else "")
     cols_html.append(
@@ -571,7 +609,12 @@ for w in range(1, n_weeks + 2):
 
 upcoming = week_load[(week_load.index >= (cur or 1)) & (week_load.index <= n_weeks)]
 headline = "nothing big left before finals. good time to get ahead on those."
-if not upcoming.empty and upcoming.max() > 0:
+counts = dated[(dated["week"] >= (cur or 1)) & (dated["week"] <= n_weeks)].groupby("week").size()
+if (upcoming.empty or upcoming.max() <= 0) and not counts.empty:
+    busy_w = int(counts.idxmax())
+    headline = (f"your busiest week ahead is <b>{week_label(busy_w, n_weeks)}</b>: "
+                f"{esc(describe(dated[dated['week'] == busy_w]))}. weights weren't listed, so this is by count.")
+elif not upcoming.empty and upcoming.max() > 0:
     heavy_w = int(upcoming.idxmax())
     prep_day = week1 + timedelta(weeks=max(1, heavy_w - lead) - 1)
     prep = ("start studying now." if prep_day <= date.today()
