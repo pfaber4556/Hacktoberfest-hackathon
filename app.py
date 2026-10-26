@@ -475,7 +475,7 @@ if go:
     with ThreadPoolExecutor(max_workers=3) as pool:  # gentle on the free-tier rate limit
         for f in files:
             data = f.getvalue()
-            ck = (hashlib.md5(data).hexdigest(), week1, n_weeks, backend)
+            ck = (hashlib.md5(data).hexdigest(), week1, n_weeks, backend, build_prompt(week1, n_weeks))            
             if ck in cache:
                 rows += to_rows(cache[ck], f.name.rsplit(".", 1)[0])
                 sources.append((cache[ck].get("course") or f.name, file_to_parts(data, f.type)))
