@@ -46,4 +46,89 @@ Syllabi and grades are personal. Because Gemma is open-weight, this entire pipel
 python -m venv venv && source venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env   # Then paste your Gemini API key (or DigitalOcean backup) into .env
-python -m streamlit run app.py
+python -m streamlit run app
+
+## ✨ Features
+
+### 📅 Plan My Quarter
+
+Upload one or more course syllabi and let Gemma analyze them.
+
+SyllabuStrat can:
+
+- Extract exams, quizzes, projects, papers, presentations, and homework
+- Identify due dates and course-grade weights
+- Organize assignments by week
+- Visualize workload across the quarter
+- Highlight upcoming crunch weeks
+- Generate an AI-powered game plan
+- Create weekly study checklists
+- Let students ask questions about their syllabi
+- Track assignment completion
+- Export important dates to a calendar
+
+The goal is to make it immediately obvious **which weeks are going to be the hardest before they happen**.
+
+---
+
+### 🎧 Study a Chapter
+
+Upload textbook material and turn a chapter into easier-to-digest study resources.
+
+Using Gemma, SyllabuStrat can transform course material into:
+
+- 🎙️ Podcast-style study content
+- 🖥️ Study slides
+- 📚 More digestible explanations of textbook material
+
+This gives students another way to learn when simply rereading a textbook isn't working.
+
+---
+
+### ⚔️ Study Battles
+
+Turn your notes or study material into a competitive quiz game.
+
+Gemma generates multiple-choice questions directly from the material you provide.
+
+#### 🤖 VS AI
+
+Battle an AI opponent while studying.
+
+Choose between opponents with different skill levels and personalities:
+
+- 😎 **Chill Rookie** — a relaxed warm-up opponent
+- 😤 **Competitive Rival** — a more challenging opponent
+- 👹 **Final Boss** — the toughest opponent
+
+Battles include:
+
+- ❤️ Lives
+- 🔥 Answer streaks
+- ✨ Streak score multipliers
+- 💬 Opponent reactions and trash talk
+- 📊 Accuracy and battle statistics
+- 📚 Post-battle question review
+
+The longer your streak, the more points each correct answer is worth.
+
+#### 👥 Local 1v1
+
+Challenge a friend on the same device.
+
+Both players answer the **same Gemma-generated questions**, but Player 1's answer stays hidden until Player 2 locks in their answer.
+
+Each player has their own:
+
+- Score
+- ❤️ Lives
+- 🔥 Streak
+- Streak multiplier
+- Accuracy
+- Battle statistics
+
+After both players answer, the correct answer and explanation are revealed.
+
+This turns studying into a head-to-head game while preventing the second player from seeing the first player's answer.
+
+---
