@@ -1,56 +1,14 @@
 # 📡 SyllabuStrat
 
-**A syllabus-to-calendar tool that shows you deadlines. SyllabuStrat shows you which weeks will actually hurt.**
+**Plan your quarter. Study smarter. Battle your friends.**
+
+SyllabuStrat is an AI-powered study companion built with **Gemma 4** that helps students turn scattered course material into an organized plan for the quarter and interactive ways to study.
+
+Instead of manually digging through syllabi, textbooks, and notes, students can use SyllabuStrat to understand when their busiest weeks are coming, generate study material from textbook chapters, and test their knowledge through competitive Study Battles.
 
 ---
 
-## **💡 The Problem & The Solution**
-
-Every college student gets 4 to 5 syllabi at the start of the term and never lines them up. As a result, Week 5 sneaks up on you—landing you with two midterms and a problem set worth 45% of your grades all at once. 
-
-**SyllabuStrat** solves this. Drop in all your syllabi, and it uses **Gemma 4** to pull out every exam, project, quiz, and paper, complete with how much each one is worth. Instead of a messy pile of dots on a calendar, you get a heatmap of your term weighted by actual grade impact.
-
----
-
-## **✨ What It Does**
-
-* **Universal Ingestion:** Reads any syllabus format—text PDFs, scanned PDFs, screenshots, or phone photos.
-* **Smart Extraction:** Extracts every graded item with its due date (or week) and weight. Shared categories split automatically (e.g., *“midterms 30%, 2 midterms”* becomes 15% each).
-* **Editable Table:** Lets you review and fix any extracted details in an interactive table before they hit the chart.
-* **Weighted Heatmap:** A classes × weeks grid where darker shades mean more of your grade is due. Hover to see what's due.
-* **🔥 Crunch Weeks:** Highlights your 3 worst weeks of the term, plus when to start prepping for each.
-* **🧠 Gemma Game Plan:** One click generates a week-by-week and day-by-day survival plan for your worst week, prioritized by grade weight.
-* **📅 Calendar Export:** Generates a `.ics` file with every due date, plus proactive "start prepping" reminders for major exams and projects.
-
----
-
-## **🛠️ Built With**
-
-* **AI & Models:** 
-  * **Gemma 4** (open weights) through the Gemini API for multimodal extraction and planning.
-  * **Gemma 4 31B** on DigitalOcean serverless inference as a backup path.
-  * `main.py` for the original Gemma smoke test.
-* **Frameworks & Libraries:** Streamlit, Altair, PyMuPDF, Pandas.
-
----
-
-## **🔒 Why Gemma?**
-
-Syllabi and grades are personal. Because Gemma is open-weight, this entire pipeline can run locally on a student's own laptop with zero data leaving their device—a privacy standard that is impossible with closed models.
-
----
-
-## **🚀 Run It**
-
-```bash
-python -m venv venv && source venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env   # Then paste your Gemini API key (or DigitalOcean backup) into .env
-python -m streamlit run app
-```
----
-
-## **✨ Features**
+## ✨ Features
 
 ### 📅 Plan My Quarter
 
@@ -134,3 +92,154 @@ After both players answer, the correct answer and explanation are revealed.
 This turns studying into a head-to-head game while preventing the second player from seeing the first player's answer.
 
 ---
+
+## 🧠 How Gemma 4 Is Used
+
+Gemma is the intelligence behind SyllabuStrat.
+
+It transforms unstructured academic material into useful study tools throughout the app.
+
+### 1. Syllabus Understanding
+
+Gemma reads syllabus content and extracts important information such as:
+
+- Assignments
+- Exams
+- Projects
+- Due dates
+- Grade weights
+- Course information
+
+### 2. Study Planning
+
+After understanding a student's courses, SyllabuStrat uses that information to help identify difficult weeks and create actionable study plans.
+
+### 3. Textbook Transformation
+
+Gemma helps transform textbook chapters into alternative study formats such as podcast-style content and study slides.
+
+### 4. Study Battles
+
+Gemma turns a student's notes into competitive multiple-choice questions.
+
+For each question, Gemma generates:
+
+- The question
+- Four answer choices
+- The correct answer
+- An explanation
+- The topic being tested
+
+Questions are grounded in the study material supplied by the student so the battle stays relevant to what they are actually learning.
+
+---
+
+## 🛠️ Built With
+
+- **Python**
+- **Streamlit**
+- **Gemma 4**
+- **Google Gemini API**
+- **DigitalOcean Serverless Inference** as a backup Gemma backend
+- **PyMuPDF** for PDF processing
+- **Pandas**
+- **Altair**
+- **python-dotenv**
+
+---
+
+## 🚀 Running SyllabuStrat Locally
+
+### 1. Clone the Repository
+
+```bash
+git clone git@github.com:pfaber4556/Hacktoberfest-hackathon.git
+cd Hacktoberfest-hackathon
+```
+
+### 2. Create a Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Add Your API Key
+
+Create a `.env` file in the project directory:
+
+```env
+GEMINI_API_KEY=your_key_here
+```
+
+SyllabuStrat can also use a DigitalOcean-hosted Gemma model as a backup:
+
+```env
+MODEL_ACCESS_KEY=your_key_here
+```
+
+> ⚠️ Never commit your `.env` file or API keys to GitHub.
+
+### 5. Start the App
+
+```bash
+python3 -m streamlit run app.py
+```
+
+Then open the local Streamlit URL shown in the terminal.
+
+---
+
+## 🎮 How to Use Study Battles
+
+1. Open **⚔️ Study Battles**
+2. Choose **🤖 VS AI** or **👥 Local 1v1**
+3. Enter the subject you're studying
+4. Choose a question difficulty
+5. Choose the number of rounds
+6. Paste your notes or study material
+7. Start the battle
+8. Gemma generates questions based on your material
+9. Compete, build streaks, protect your lives, and review what you missed
+
+---
+
+## 💡 Why We Built It
+
+College students often have all the information they need to succeed, but that information is scattered across syllabi, textbooks, assignments, notes, and calendars.
+
+SyllabuStrat brings those pieces together.
+
+Instead of using AI simply to answer questions for students, SyllabuStrat uses AI to help students **plan, learn, practice, and compete**.
+
+The idea is simple:
+
+> **Know what's coming. Learn the material. Prove you know it.**
+
+---
+
+## 🔮 What's Next
+
+We're continuing to explore ways to make studying more interactive and personalized.
+
+Possible future features include:
+
+- 🌐 Online 1v1 Study Battles
+- ⏱️ Timed battle rounds
+- 🧠 Personalized Gemma post-battle study reports
+- 🏆 Leaderboards and achievements
+- 🔥 Long-term study streaks
+- 👥 Multiplayer study rooms
+- 🎯 Adaptive question difficulty based on performance
+
+---
+
+## 📡 SyllabuStrat
+
+**Turn your semester into a strategy.**
